@@ -1,0 +1,14 @@
+management:
+  security.enabled: false
+  endpoints:
+    web.exposure.include: health,info,env,mappings
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:test
+    username: sa
+
+analytics:
+  trigger-route: "direct:analytics-trigger"
+  read-file-uri: "file:src/test/resources?noop=true&fileName=input.csv"
+  insert-db-uri: "sql:INSERT INTO users (id,used_directory_search_last_access_timestamp) VALUES (:#id,:#used_directory_search_last_access_timestamp)"
