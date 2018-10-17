@@ -35,3 +35,9 @@ used_directory_search_flag VARCHAR(255),
 used_directory_search_count VARCHAR(255),
 used_directory_search_last_access_timestamp VARCHAR(255)
 );
+
+CREATE TABLE users_sf (
+id VARCHAR(255),
+creation_time VARCHAR(255),
+last_update_time VARCHAR(255)
+);

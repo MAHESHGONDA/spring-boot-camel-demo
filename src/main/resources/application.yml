@@ -12,3 +12,9 @@ analytics:
   trigger-route: "direct:analytics-trigger"
   read-file-uri: "file:src/test/resources?noop=true&fileName=input.csv"
   insert-db-uri: "sql:INSERT INTO users (id,used_directory_search_last_access_timestamp) VALUES (:#id,:#used_directory_search_last_access_timestamp)"
+
+
+api:
+  trigger-route: "direct:api-trigger"
+  api-endpoint: "http4://localhost:8082/users"
+  insert-user-uri: "sql:INSERT INTO users_sf (id, creation_time, last_update_time) VALUES (:#id, :#creationTime, :#lastUpdateTime)"
