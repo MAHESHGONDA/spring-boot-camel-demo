@@ -2,51 +2,53 @@ package com.example.demo.camel;
 
 import com.example.demo.model.User;
 import com.example.demo.model.UserResponse;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.model.dataformat.JsonDataFormat;
+import org.apache.camel.model.dataformat.CsvDataFormat;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Component
 public class CamelRoutes extends RouteBuilder {
 
-    @Autowired
-    ObjectMapper mapper;
-
     @Override
     public void configure() {
         analyticsTrigger();
         getUsersTrigger();
+        userExtractionTrigger();
+        commonRoute();
+    }
+
+    private void commonRoute() {
+        from("{{common.trigger-route}}").routeId("common.trigger-route")
+                 .to("{{api.trigger-route}}")
+                .to("{{analytics.trigger-route}}")
+                .to("{{extraction.trigger-route}}").end();
     }
 
     private void analyticsTrigger() {
         from("{{analytics.trigger-route}}")
-            .routeId("analytics.trigger-route")
-            .pollEnrich("{{analytics.read-file-uri}}")
-            .split(body().tokenize("\n")).streaming()
+                .routeId("analytics.trigger-route")
+                .pollEnrich("{{analytics.read-file-uri}}")
+                .split(body().tokenize("\n")).streaming()
                 .filter().simple("${headers.CamelSplitIndex}  > 0")
-                    .log("Line: ${body}")
-                    .process(ex -> {
-                        String body = ex.getIn().getBody(String.class);
-                        String[] values = body.split(",");
+                .log("Line: ${body}")
+                .process(ex -> {
+                    String body = ex.getIn().getBody(String.class);
+                    String[] values = body.split(",");
 
-                        Map<String, Object> user = new HashMap<>();
-                        user.put("id", values[0]);
-                        user.put("used_directory_search_last_access_timestamp", values[12]);
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("id", values[0]);
+                    user.put("used_directory_search_last_access_timestamp", values[12]);
 
-                        ex.getIn().setBody(user);
-                    })
-                    .to("{{analytics.insert-db-uri}}")
+                    ex.getIn().setBody(user);
+                })
+                .to("{{analytics.insert-db-uri}}")
                 .end()
-            ;
+        ;
     }
 
     private void getUsersTrigger() {
@@ -68,5 +70,20 @@ public class CamelRoutes extends RouteBuilder {
                 })
                 .to("{{api.insert-user-uri}}")
                 .end();
+    }
+
+    private void userExtractionTrigger() {
+        CsvDataFormat csv = new CsvDataFormat();
+        csv.setDelimiter(",");
+        //csv.setHeader(Arrays.asList("ID", "creationTime", "lastUpdateTime","used_directory_search_last_access_timestamp"));
+        from("{{extraction.trigger-route}}")
+                .routeId("extraction.trigger-route")
+                .to("{{extraction.read-db-uri}}")
+                .log("Line: ${body}")
+                .split(body()).streaming()
+                .marshal(csv)
+                .to("{{extraction.create-file-uri}}")
+                .end();
+
     }
 }

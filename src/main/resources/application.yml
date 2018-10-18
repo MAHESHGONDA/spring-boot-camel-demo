@@ -8,6 +8,9 @@ spring:
     url: jdbc:h2:mem:test
     username: sa
 
+common:
+  trigger-route: "direct:start"
+
 analytics:
   trigger-route: "direct:analytics-trigger"
   read-file-uri: "file:src/test/resources?noop=true&fileName=input.csv"
@@ -15,6 +18,12 @@ analytics:
 
 
 api:
-  trigger-route: "direct:api-trigger"
-  api-endpoint: "http4://localhost:8082/users"
+  trigger-route:   "direct:api-trigger"
+  api-endpoint:    "http4://localhost:8082/users"
   insert-user-uri: "sql:INSERT INTO users_sf (id, creation_time, last_update_time) VALUES (:#id, :#creationTime, :#lastUpdateTime)"
+
+
+extraction:
+  trigger-route: "direct:extraction-trigger"
+  read-db-uri:   "sql:SELECT a.id,b.creation_time,b.last_update_time, a.used_directory_search_last_access_timestamp  from users a join  users_sf b on a.id = b.id"
+  create-file-uri: "file:src/data/out?fileName=MyFile.csv&fileExist=Append"

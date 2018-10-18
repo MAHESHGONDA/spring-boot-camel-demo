@@ -11,21 +11,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/triggers")
 public class TriggerController {
     private final ProducerTemplate producerTemplate;
-    private final String analyticsTriggerRoute;
-    private final String apiTriggerRoute;
+    private final String commonRoute;
 
     public TriggerController(ProducerTemplate producerTemplate, 
-                             @Value("${analytics.trigger-route}") String analyticsTriggerRoute,
-                             @Value("${api.trigger-route}") String apiTriggerRoute) {
+                             @Value("${common.trigger-route}") String commonRoute) {
         this.producerTemplate = producerTemplate;
-        this.analyticsTriggerRoute = analyticsTriggerRoute;
-        this.apiTriggerRoute = apiTriggerRoute;
+        this.commonRoute = commonRoute;
     }
     
-    @GetMapping("/read-analytics")
-    public ResponseEntity readAnalytics() {
-        producerTemplate.asyncRequestBody(analyticsTriggerRoute, null);
-        producerTemplate.asyncRequestBody(apiTriggerRoute, null);
+    @GetMapping("/user-extraction")
+    public ResponseEntity userInfoExtraction() {
+        producerTemplate.asyncRequestBody(commonRoute, null);
         return ResponseEntity.accepted().build();
     }
 
