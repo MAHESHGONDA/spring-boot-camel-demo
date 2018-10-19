@@ -1,4 +1,4 @@
-package com.example.demo.model;
+package com.maple.extract.model;
 
 import lombok.Builder;
 import lombok.Data;

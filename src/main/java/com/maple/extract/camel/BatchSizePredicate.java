@@ -1,4 +1,4 @@
-package com.example.demo.camel;
+package com.maple.extract.camel;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.Predicate;

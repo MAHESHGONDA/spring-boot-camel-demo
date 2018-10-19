@@ -1,4 +1,4 @@
-package com.example.demo.web;
+package com.maple.extract.web;
 
 import org.apache.camel.ProducerTemplate;
 import org.springframework.beans.factory.annotation.Value;
