@@ -19,6 +19,7 @@ analytics:
 
 api:
   trigger-route:   "direct:api-trigger"
+  access-token-uri: "https4://d-apigw.qhrtech.com/auth/oauth/v2/token"
   api-endpoint:    "http4://localhost:8082/users"
   insert-user-uri: "sql:INSERT INTO users_sf (id, creation_time, last_update_time) VALUES (:#id, :#creationTime, :#lastUpdateTime)"
 

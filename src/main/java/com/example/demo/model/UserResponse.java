@@ -9,5 +9,13 @@ import java.util.List;
 @Builder
 public class UserResponse {
     List<User> content;
-    String nextURI;
+    String pageable;
+    boolean last;
+    int totalPages;
+    int totalElements;
+    int size;
+    int number;
+    Object[] sort;
+    boolean first;
+    int numberOfElements;
 }
