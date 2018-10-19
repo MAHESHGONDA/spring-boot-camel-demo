@@ -89,25 +89,25 @@ public class CamelRoutes extends RouteBuilder {
                     .setHeader("cache-control", simple("{{api.cache-control}}"))
                     .setHeader("Authorization", simple("Bearer ${property.access_token}"))
 
-                    // Api call to get User List
-                    .recipientList(simple("http4://localhost:8082/users?page=${property.page}&size="+MAX_RECORDS))
+                // Api call to get User List
+                .recipientList(simple("{{api.api-endpoint}}?page=${property.page}&size="+MAX_RECORDS))
                     .unmarshal().json(JsonLibrary.Jackson, UserResponse.class)
                     .setProperty("isLast", simple("${body.last}"))
                     .setBody(simple("${body.content}"))
                     .split(body()).streaming()
                         .process(ex->{
                             User user = ex.getIn().getBody(User.class);
-                                                Map<String, Object> dbUser = new HashMap<>();
-                                                dbUser.put("id", user.getId());
-                                                dbUser.put("creationTime", user.getCreationTime());
-                                                dbUser.put("lastUpdateTime", user.getLastUpdated());
-                                                ex.getIn().setBody(dbUser);
+                            Map<String, Object> dbUser = new HashMap<>();
+                            dbUser.put("id", user.getId());
+                            dbUser.put("creationTime", user.getCreationTime());
+                            dbUser.put("lastUpdateTime", user.getLastUpdated());
+                            ex.getIn().setBody(dbUser);
                         })
                         .to("{{api.insert-user-uri}}")
                     .end()
                     .process(ex -> {
                         Integer o = (Integer) ex.getProperty("page");
-                        ex.setProperty("page", o+1);
+                        ex.setProperty("page", o.intValue() + 1);
                         ex.getIn().setBody(null);
                     })
                 .end();
