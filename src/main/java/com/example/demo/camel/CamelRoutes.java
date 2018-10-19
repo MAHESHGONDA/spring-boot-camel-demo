@@ -57,28 +57,31 @@ public class CamelRoutes extends RouteBuilder {
                 .routeId("api.trigger-route")
                 .log("Lin: ${headers}")
 
-                .process(exchange -> exchange.getIn().setBody("{\"grant_type\": \"client_credentials\", \"scope\": \"idp.link.okta_pcid_report\"}")) //TODO use a request class
+               // .process(exchange -> exchange.getIn().setBody("{\"grant_type\": \"client_credentials\", \"scope\": \"idp.link.okta_pcid_report\"}")) //TODO use a request class
                 .setHeader(Exchange.HTTP_METHOD, constant("POST"))
                 .setHeader("content-type", constant("application/x-www-form-urlencoded"))
                 .setHeader("authorization", constant("Basic ODBhZjJkMzItNmFiOC00ZmZjLWE0MjgtZWNlNjdiNzkzOTE2OmJhNzVkMWYyLThiYjYtNDFmMC1iMmUzLTI4ODRjNWZkMzhhYQ==")) //TODO Get Base 64
-                .setHeader("accept", constant("*/*"))
-                .setHeader("accept-encoding", constant("gzip, deflate"))
-                .setHeader("content-length", constant("53"))
+//                .setHeader("accept", constant("*/*"))
+//                .setHeader("accept-encoding", constant("gzip, deflate"))
+//                .setHeader("content-length", constant("53"))
+                .process(ex->{
+                    ex.getIn();
+                })
 
-               // .setBody(constant("grant_type: client_credentials, scope: idp.link.okta_pcid_report"))
-              //  .to("{{api.access-token-uri}}")
+                .setBody(constant("grant_type: client_credentials, scope: idp.link.okta_pcid_report"))
+             //   .to("{{api.access-token-uri}}")
                 .log("value:::::${body}")
                 .setBody(constant(""))
                // .unmarshal().json(JsonLibrary.Jackson, Object.class)
              //   .setBody(simple("${body.access_token}"))
-                .setHeader("page", constant(0))
-                .loopDoWhile(simple("${header.page} == 0 || ${header.isLast} != true"))
+                .setProperty("page", constant(0))
+                .loopDoWhile(simple("${property.page} == 0 || ${property.isLast} != true"))
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 .setHeader("cache-control", constant("no-cache"))
               //  .setHeader("Authorization", simple("${body.access_token}"))
-                .recipientList(simple("http4://localhost:8082/users?page=${header.page}&size="+MAX_RECORDS))
+                .recipientList(simple("http4://localhost:8082/users?page=${property.page}&size="+MAX_RECORDS))
                 .unmarshal().json(JsonLibrary.Jackson, UserResponse.class)
-                .setHeader("isLast", simple("${body.last}"))
+                .setProperty("isLast", simple("${body.last}"))
                 .setBody(simple("${body.content}"))
                 .split(body()).streaming()
                 .process(ex->{
@@ -93,8 +96,8 @@ public class CamelRoutes extends RouteBuilder {
                 .to("{{api.insert-user-uri}}")
                 .end()
                 .process(ex -> {
-                    Integer o = (Integer) ex.getIn().getHeader("page");
-                    ex.getIn().setHeader("page", o+1);
+                    Integer o = (Integer) ex.getProperty("page");
+                    ex.setProperty("page", o+1);
                     ex.getIn().setBody(null);
                 })
                 .end();
