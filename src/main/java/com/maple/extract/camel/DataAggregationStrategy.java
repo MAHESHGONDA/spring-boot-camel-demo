@@ -6,16 +6,16 @@ import org.apache.camel.processor.aggregate.AggregationStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class DataAggregationStrategy implements AggregationStrategy {
 
     public Exchange aggregate(Exchange oldExchange, Exchange newExchange) {
         Message newIn = newExchange.getIn();
-        List user = newIn.getBody(List.class);
+        Map user = newIn.getBody(Map.class);
         List list = null;
         if (null == oldExchange) {
             list = new ArrayList();
-            System.out.println(user);
             list.add(user);
             newIn.setBody(list);
             return newExchange;

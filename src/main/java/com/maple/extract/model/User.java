@@ -11,8 +11,8 @@ public class User {
     String givenName;
     String lastName;
     String primaryEmail;
-    String login;
+    Login login;
     Object[] links;
-    String creationTime;
+    String createdDate;
     String lastUpdated;
 }

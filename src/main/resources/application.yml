@@ -5,7 +5,7 @@ management:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:test
+    url: jdbc:h2:mem:test;TRACE_LEVEL_FILE=3
     username: sa
 
 common:
@@ -24,15 +24,16 @@ api:
   trigger-route:   "direct:api-trigger"
   access-token-uri: "https4://d-apigw.qhrtech.com/auth/oauth/v2/token"
   api-endpoint:    "http4://localhost:8082/users"
-  insert-user-uri: "sql:INSERT INTO users_sf (id, creation_time, last_update_time) VALUES (:#id, :#creationTime, :#lastUpdateTime)"
+  insert-user-uri: "sql:INSERT INTO users_sf (id, creation_time, last_update_time) VALUES (:#id, :#creationTime, :#lastUpdateTime)?batch=true"
   content-type: "application/x-www-form-urlencoded"
   auth-api-body: "grant_type=client_credentials&scope=idp.link.okta_pcid_report"
   cache-control: "no-cache"
   client-id: "80af2d32-6ab8-4ffc-a428-ece67b793916"
   secret-key: "ba75d1f2-8bb6-41f0-b2e3-2884c5fd38aa"
+  batch-size: "1000"
 
 
 extraction:
   trigger-route: "direct:extraction-trigger"
-  read-db-uri:   "sql:SELECT id, creation_time, last_update_time from users_sf"
+  read-db-uri:   "sql:SELECT * from users_sf"
   create-file-uri: "file:src/data/out?fileName=Extracted_User.csv&fileExist=Append"

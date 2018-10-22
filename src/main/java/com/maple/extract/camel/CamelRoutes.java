@@ -3,7 +3,8 @@ package com.maple.extract.camel;
 import com.maple.extract.model.Authetication;
 import com.maple.extract.model.User;
 import com.maple.extract.model.UserResponse;
-import org.apache.camel.Exchange;
+import com.maple.extract.processor.ExceptionHandlingProcessor;
+import com.maple.extract.processor.UserProcessor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.CsvDataFormat;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -14,7 +15,6 @@ import java.util.*;
 @Component
 public class CamelRoutes extends RouteBuilder {
 
-    private static final int MAX_RECORDS = 900;
     @Override
     public void configure() {
         analyticsTrigger();
@@ -24,17 +24,25 @@ public class CamelRoutes extends RouteBuilder {
     }
 
     private void commonRoute() {
+
         from("{{common.trigger-route}}")
                 .routeId("common.trigger-route")
+                .onException(Exception.class)
+                    .handled(true)
+                    .maximumRedeliveries(3)
+                    .redeliveryDelay(0)
+                .end()
                 .choice()
-                    .when(simple("{{common.enable-api-route}}"))
-                        .to("{{api.trigger-route}}")
-                    .endChoice()
-                    .when(simple("{{common.enable-analytics-route}}"))
-                        .to("{{analytics.trigger-route}}")
-                    .endChoice()
+                .when(simple("{{common.enable-api-route}}")) //TODO attempt to run it 3 times
+                .to("{{api.trigger-route}}")
+                .endChoice()
+                .when(simple("{{common.enable-analytics-route}}"))
+                .to("{{analytics.trigger-route}}")
+                .endChoice()
                 .end()
                 .to("{{extraction.trigger-route}}");
+
+
     }
 
     private void analyticsTrigger() {
@@ -62,68 +70,59 @@ public class CamelRoutes extends RouteBuilder {
         from("{{api.trigger-route}}")
                 .routeId("api.trigger-route")
 
-                // Creating base64 string
-                .setProperty("client-id", simple("{{api.client-id}}"))
-                .setProperty("secret-key", simple("{{api.secret-key}}"))
-                .process(ex -> {
-                    String baseString = (String) ex.getProperty("client-id") + ":" + (String) ex.getProperty("secret-key");
-                    String base64String = Base64.getEncoder().encodeToString(baseString.getBytes());
-                    ex.setProperty("base64String", base64String);
-                })
+                // Exception Handling
+                .onException(Exception.class)
+                .handled(true)
+                .process(new ExceptionHandlingProcessor())
+                .end()
 
-                // Api call to get authetication token
-                .setHeader(Exchange.HTTP_METHOD, constant("POST"))
-                .setHeader("content-type", simple("{{api.content-type}}"))
-                .setHeader("authorization", simple("Basic ${property.base64String}"))
-                .setBody(simple("{{api.auth-api-body}}"))
+                // Api call to get Authentication token
+                .process(new UserProcessor("Authentication"))
                 .to("{{api.access-token-uri}}")
                 .convertBodyTo(String.class)
                 .unmarshal().json(JsonLibrary.Jackson, Authetication.class)
 
                 // Running a loop untill property.isLast == true
-                .setProperty("access_token", constant("${body.access_token}"))
-                .setBody(simple(null))
-                .setProperty("page", constant(0))
-                .loopDoWhile(simple("${property.page} == 0 || ${property.isLast} != true"))
-                    .setHeader(Exchange.HTTP_METHOD, constant("GET"))
-                    .setHeader("cache-control", simple("{{api.cache-control}}"))
-                    .setHeader("Authorization", simple("Bearer ${property.access_token}"))
+                .process(new UserProcessor("GetUsers"))
+                .loopDoWhile(simple("${property.CamelLoopIndex} == 0 || ${property.isLast} != true"))
 
                 // Api call to get User List
-                .recipientList(simple("{{api.api-endpoint}}?page=${property.page}&size="+MAX_RECORDS))
-                    .unmarshal().json(JsonLibrary.Jackson, UserResponse.class)
-                    .setProperty("isLast", simple("${body.last}"))
-                    .setBody(simple("${body.content}"))
-                    .split(body()).streaming()
-                        .process(ex->{
-                            User user = ex.getIn().getBody(User.class);
-                            Map<String, Object> dbUser = new HashMap<>();
-                            dbUser.put("id", user.getId());
-                            dbUser.put("creationTime", user.getCreationTime());
-                            dbUser.put("lastUpdateTime", user.getLastUpdated());
-                            ex.getIn().setBody(dbUser);
-                        })
-                        .to("{{api.insert-user-uri}}")
-                    .end()
-                    .process(ex -> {
-                        Integer o = (Integer) ex.getProperty("page");
-                        ex.setProperty("page", o.intValue() + 1);
-                        ex.getIn().setBody(null);
-                    })
+                .setBody(simple(null))
+                .toD("{{api.api-endpoint}}?page=${property.CamelLoopIndex}&size={{api.batch-size}}")
+                .unmarshal().json(JsonLibrary.Jackson, UserResponse.class)
+                .setProperty("isLast", simple("${body.last}"))
+                .setBody(simple("${body.content}"))
+                .setProperty("dataCount", simple("${body.size()}"))
+                .split(body()).streaming()
+                .process(ex -> {
+                    User user = ex.getIn().getBody(User.class);
+                    Map<String, Object> dbUser = new HashMap<>();
+                    dbUser.put("id", user.getId());
+                    dbUser.put("creationTime", user.getCreatedDate());
+                    dbUser.put("lastUpdateTime", user.getLastUpdated());
+                    ex.getIn().setBody(dbUser);
+                })
+                .aggregate(constant(true),
+                        new DataAggregationStrategy())
+                .completionSize(simple("${property.dataCount}"))
+                .transform(simple("${body}"))
+                .end()
+
+                // Inserting data to h2 db
+                .to("{{api.insert-user-uri}}")
                 .end();
     }
 
     private void userExtractionTrigger() {
         CsvDataFormat csv = new CsvDataFormat();
-        csv.setDelimiter(",");
-        //csv.setHeader(Arrays.asList("ID", "creationTime", "lastUpdateTime","used_directory_search_last_access_timestamp"));
+        csv.setDelimiter("|"); //TODO Need to ask: what shall we show for empty fields, 1) show null 2) skip it from writing to csv 3) leave empty delemeters?
+        csv.setHeader(Arrays.asList("id", "creation_time", "last_update_time", "program_enrollment_timestamp", "program_last_accessed_timestamp", "program_accessed_count", "used_virtual_care_flag", "used_virtual_care_count",
+                "used_virtual_care_last_access_timestamp", "used_directory_search_flag", "used_directory_search_count", "used_directory_search_last_access_timestamp"));
+
         from("{{extraction.trigger-route}}")
                 .routeId("extraction.trigger-route")
                 .to("{{extraction.read-db-uri}}")
-                .log("Line: ${body}")
-                .split(body()).streaming()
                 .marshal(csv)
-                .to("{{extraction.create-file-uri}}")
-                .end();
+                .to("{{extraction.create-file-uri}}");
     }
 }
